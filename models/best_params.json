@@ -1,0 +1,18 @@
+{
+  "random_forest": {
+    "n_estimators": 385,
+    "max_depth": 19,
+    "min_samples_split": 5,
+    "min_samples_leaf": 2,
+    "max_features": "sqrt"
+  },
+  "xgboost": {
+    "n_estimators": 376,
+    "max_depth": 3,
+    "learning_rate": 0.038346568074995674,
+    "subsample": 0.8599007690712851,
+    "colsample_bytree": 0.6411759630563697,
+    "min_child_weight": 1,
+    "gamma": 1.8262807052015186
+  }
+}

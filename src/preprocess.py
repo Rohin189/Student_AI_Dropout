@@ -1,8 +1,15 @@
-import os
+from pathlib import Path
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import joblib
+
+# Resolves to the project root (Student-AI-Dropout-Risk-System/) regardless
+# of the directory the script is launched from.
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+RAW_DATA_PATH = PROJECT_ROOT / 'data' / 'raw' / 'student_data.csv'
+PROCESSED_DIR = PROJECT_ROOT / 'data' / 'processed'
+MODELS_DIR = PROJECT_ROOT / 'models'
 
 
 def engineer_features(df):
@@ -55,10 +62,10 @@ def preprocess_and_save_production(df):
         X, y, test_size=0.2, random_state=42, stratify=y
     )
 
-    os.makedirs('../data/processed', exist_ok=True)
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
-    X_train.to_csv('../data/processed/X_train.csv', index=False)
-    X_test.to_csv('../data/processed/X_test.csv', index=False)
+    X_train.to_csv(PROCESSED_DIR / 'X_train.csv', index=False)
+    X_test.to_csv(PROCESSED_DIR / 'X_test.csv', index=False)
 
     X_train_scaled = X_train.copy()
     X_test_scaled = X_test.copy()
@@ -66,18 +73,18 @@ def preprocess_and_save_production(df):
     X_train_scaled[numerical_cols] = scaler.fit_transform(X_train[numerical_cols])
     X_test_scaled[numerical_cols] = scaler.transform(X_test[numerical_cols])
 
-    X_train_scaled.to_csv('../data/processed/X_train_scaled.csv', index=False)
-    X_test_scaled.to_csv('../data/processed/X_test_scaled.csv', index=False)
+    X_train_scaled.to_csv(PROCESSED_DIR / 'X_train_scaled.csv', index=False)
+    X_test_scaled.to_csv(PROCESSED_DIR / 'X_test_scaled.csv', index=False)
 
-    y_train.to_csv('../data/processed/y_train.csv', index=False)
-    y_test.to_csv('../data/processed/y_test.csv', index=False)
+    y_train.to_csv(PROCESSED_DIR / 'y_train.csv', index=False)
+    y_test.to_csv(PROCESSED_DIR / 'y_test.csv', index=False)
 
-    os.makedirs('../models', exist_ok=True)
-    joblib.dump(scaler, '../models/scaler.pkl')
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    joblib.dump(scaler, MODELS_DIR / 'scaler.pkl')
 
     print("Preprocessing complete! Outputs successfully generated with isolated scaling tracks.")
 
 
 if __name__ == "__main__":
-    df = pd.read_csv('data/raw/student_data.csv', sep=';')
+    df = pd.read_csv(RAW_DATA_PATH, sep=';')
     preprocess_and_save_production(df)

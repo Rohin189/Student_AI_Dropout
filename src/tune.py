@@ -1,3 +1,4 @@
+from pathlib import Path
 import json
 import optuna
 import pandas as pd
@@ -5,10 +6,14 @@ from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROCESSED_DIR = PROJECT_ROOT / 'data' / 'processed'
+MODELS_DIR = PROJECT_ROOT / 'models'
+
 
 def load_processed_data():
-    X_train = pd.read_csv('../data/processed/X_train.csv')
-    y_train = pd.read_csv('../data/processed/y_train.csv').values.ravel()
+    X_train = pd.read_csv(PROCESSED_DIR / 'X_train.csv')
+    y_train = pd.read_csv(PROCESSED_DIR / 'y_train.csv').values.ravel()
     return X_train, y_train
 
 
@@ -73,9 +78,10 @@ def tune_models(n_trials=75):
         'random_forest': rf_study.best_params,
         'xgboost': xgb_study.best_params
     }
-    with open('../models/best_params.json', 'w') as f:
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    with open(MODELS_DIR / 'best_params.json', 'w') as f:
         json.dump(best_params, f, indent=2)
-    print("\nSaved best hyperparameters to ../models/best_params.json")
+    print(f"\nSaved best hyperparameters to {MODELS_DIR / 'best_params.json'}")
 
     return rf_study, xgb_study
 

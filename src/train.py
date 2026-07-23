@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
@@ -8,14 +8,18 @@ from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 )
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROCESSED_DIR = PROJECT_ROOT / 'data' / 'processed'
+RESULTS_DIR = PROJECT_ROOT / 'results'
+
 
 def load_processed_data():
-    X_train = pd.read_csv('../data/processed/X_train.csv')
-    X_test = pd.read_csv('../data/processed/X_test.csv')
-    X_train_scaled = pd.read_csv('../data/processed/X_train_scaled.csv')
-    X_test_scaled = pd.read_csv('../data/processed/X_test_scaled.csv')
-    y_train = pd.read_csv('../data/processed/y_train.csv').values.ravel()
-    y_test = pd.read_csv('../data/processed/y_test.csv').values.ravel()
+    X_train = pd.read_csv(PROCESSED_DIR / 'X_train.csv')
+    X_test = pd.read_csv(PROCESSED_DIR / 'X_test.csv')
+    X_train_scaled = pd.read_csv(PROCESSED_DIR / 'X_train_scaled.csv')
+    X_test_scaled = pd.read_csv(PROCESSED_DIR / 'X_test_scaled.csv')
+    y_train = pd.read_csv(PROCESSED_DIR / 'y_train.csv').values.ravel()
+    y_test = pd.read_csv(PROCESSED_DIR / 'y_test.csv').values.ravel()
     return X_train, X_test, X_train_scaled, X_test_scaled, y_train, y_test
 
 
@@ -69,9 +73,9 @@ def train_baseline_models():
 
     results_df = pd.DataFrame(results).sort_values('ROC-AUC', ascending=False)
 
-    os.makedirs('results', exist_ok=True)
-    results_df.to_csv('results/baseline_results.csv', index=False)
-    print("\nSaved to results/baseline_results.csv")
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    results_df.to_csv(RESULTS_DIR / 'baseline_results.csv', index=False)
+    print(f"\nSaved to {RESULTS_DIR / 'baseline_results.csv'}")
     print(results_df.to_string(index=False))
 
     return trained_models, results_df
