@@ -3,7 +3,8 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import joblib
-
+# already exists in src/preprocess.py — no change needed, just confirming import path
+from preprocess import engineer_features
 # Resolves to the project root (Student-AI-Dropout-Risk-System/) regardless
 # of the directory the script is launched from.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
