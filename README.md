@@ -3,6 +3,8 @@
 An end-to-end machine learning system that predicts a student's probability of dropping out, and explains *why*, so academic advisors can identify and support at-risk students before it's too late.
 
 **🔗 Live Demo:** https://student-dropout-risks.streamlit.app/
+
+
 **📂 Repository:** https://github.com/Rohin189/Student_AI_Dropout
 
 ---
@@ -135,6 +137,12 @@ Student-AI-Dropout-Risk-System/
     ├── evaluate_tuned.py, threshold.py
     ├── explain.py, predict.py
 ```
+
+## License
+
+This project is licensed under the MIT License — see [LICENSE](LICENSE) for details. You're free to use, modify, and distribute this code, with attribution.
+
+The dataset used ([UCI Predict Students' Dropout and Academic Success](https://archive.ics.uci.edu/dataset/697/predict+students+dropout+and+academic+success)) is separately licensed under CC BY 4.0 by its original creators (Realinho, V., Vieira Martins, M., Machado, J., Baptista, L.) and is credited here accordingly. The MIT License above covers this repository's code only, not the dataset itself.
 
 ## Author
 
