@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import shap
 import matplotlib.pyplot as plt
-
+import numpy as np
 PROJECT_ROOT = Path(__file__).resolve().parent
 import sys
 sys.path.append(str(PROJECT_ROOT / 'src'))
@@ -182,13 +182,136 @@ elif page == "🔍 Explain Prediction":
 # =========================================================
 # MODEL PERFORMANCE  (placeholder)
 # =========================================================
+
 elif page == "📈 Model Performance":
     st.title("📈 Model Performance")
-    st.warning("This tab is under construction — coming after Predict/Explain.")
+
+    st.subheader("Model Comparison")
+    st.dataframe(results_df.style.highlight_max(subset=['Test ROC-AUC', 'F1 Score'], color='lightgreen'))
+
+    st.caption(f"Production model: **XGBoost**, threshold = {decision_config['threshold']:.3f} (Youden's J)")
+
+    st.divider()
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("Global Feature Importance (SHAP)")
+        st.image(str(PROJECT_ROOT / 'results' / 'shap_summary.png'), use_container_width=True)
+    with col2:
+        st.subheader("Precision/Recall vs Threshold — XGBoost")
+        st.image(str(PROJECT_ROOT / 'results' / 'xgboost_threshold_curve.png'), use_container_width=True)
+
+    st.divider()
+    st.subheader("Why this threshold?")
+    st.info(decision_config['rationale'])
 
 # =========================================================
 # UPLOAD CSV  (placeholder)
 # =========================================================
 elif page == "📂 Upload CSV":
     st.title("📂 Upload CSV — Batch Scoring")
-    st.warning("This tab is under construction — built last, depends on the other tabs.")
+    st.markdown("""
+    Upload a CSV of students to score in bulk. The file should contain the same columns
+    as the original dataset (semicolon or comma separated). Missing columns will be filled
+    with typical training-set values; unrecognized columns will be ignored.
+    """)
+
+    uploaded_file = st.file_uploader("Choose a CSV file", type=["csv"])
+
+    if uploaded_file is not None:
+        try:
+            # Read raw bytes once so we can retry with a different separator if needed
+            raw_bytes = uploaded_file.read()
+
+            def try_read(sep):
+                from io import BytesIO
+                return pd.read_csv(BytesIO(raw_bytes), sep=sep)
+
+            batch_df = try_read(',')
+            if batch_df.shape[1] <= 1:
+                # Comma parse produced a single column — likely semicolon-delimited
+                batch_df = try_read(';')
+
+            if batch_df.shape[1] <= 1:
+                raise ValueError(
+                    "Could not detect a valid delimiter (tried comma and semicolon). "
+                    "Please check the file format."
+                )
+
+            batch_df.columns = [col.strip().replace(' ', '_') for col in batch_df.columns]
+
+            feature_columns, defaults = load_feature_schema()
+
+            missing_cols = [c for c in feature_columns if c not in batch_df.columns]
+            extra_cols = [c for c in batch_df.columns if c not in feature_columns
+                          and c not in ('Target', 'Target_Binary')]
+
+            # Hard stop if almost nothing matched — this is the real safety net
+            match_rate = 1 - (len(missing_cols) / len(feature_columns))
+            if match_rate < 0.5:
+                st.error(
+                    f"❌ Only {len(feature_columns) - len(missing_cols)} of "
+                    f"{len(feature_columns)} expected columns were found. This usually means "
+                    f"the file's delimiter or column names don't match the expected format. "
+                    f"Scoring was not performed."
+                )
+                st.stop()
+
+            if missing_cols:
+                st.warning(f"⚠️ {len(missing_cols)} column(s) missing from upload — "
+                           f"filled with training-set defaults: {', '.join(missing_cols[:5])}"
+                           f"{'...' if len(missing_cols) > 5 else ''}")
+            if extra_cols:
+                st.caption(f"Note: {len(extra_cols)} unrecognized column(s) ignored: "
+                          f"{', '.join(extra_cols[:5])}{'...' if len(extra_cols) > 5 else ''}")
+
+            # ... rest stays the same from here (fill missing, engineer feature, score, etc.)
+            # Fill missing columns with defaults, keep only known feature columns
+            for col in missing_cols:
+                batch_df[col] = defaults[col]
+
+            # Recompute engineered feature per row
+            batch_df['Had_Semester_Failure'] = (
+                (batch_df.get('Curricular_units_1st_sem_(approved)', defaults.get('Curricular_units_1st_sem_(approved)', 0)) == 0) |
+                (batch_df.get('Curricular_units_2nd_sem_(approved)', defaults.get('Curricular_units_2nd_sem_(approved)', 0)) == 0)
+            ).astype(int)
+
+            scoring_df = batch_df[feature_columns].copy()
+
+            with st.spinner(f"Scoring {len(scoring_df)} students..."):
+                probas = model.predict_proba(scoring_df)[:, 1]
+                threshold = decision_config['threshold']
+                risk_flags = (probas >= threshold)
+
+            output_df = batch_df.copy()
+            output_df['Dropout_Risk_Probability'] = probas.round(4)
+            output_df['Risk_Flag'] = np.where(risk_flags, 'High Risk', 'Low Risk')
+
+            st.success(f"✅ Scored {len(output_df)} students.")
+
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Students", len(output_df))
+            with col2:
+                st.metric("Flagged High Risk", int(risk_flags.sum()))
+            with col3:
+                st.metric("High Risk Rate", f"{risk_flags.mean():.1%}")
+
+            st.dataframe(
+                output_df[['Dropout_Risk_Probability', 'Risk_Flag'] +
+                          [c for c in batch_df.columns if c not in feature_columns]]
+                .sort_values('Dropout_Risk_Probability', ascending=False),
+                use_container_width=True
+            )
+
+            csv_output = output_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                "⬇️ Download Scored Results",
+                data=csv_output,
+                file_name="dropout_risk_predictions.csv",
+                mime="text/csv"
+            )
+
+        except Exception as e:
+            st.error(f"❌ Could not process this file: {e}")
+            st.info("Make sure the CSV matches the expected column format from the original dataset.")

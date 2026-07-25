@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import (
-    roc_curve, precision_recall_curve, fbeta_score,
-    confusion_matrix, ConfusionMatrixDisplay
+    roc_curve, precision_recall_curve, roc_auc_score,
+    confusion_matrix
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -30,13 +30,12 @@ def find_youden_threshold(y_true, y_proba):
 
 def find_f2_threshold(y_true, y_proba):
     precision, recall, thresholds = precision_recall_curve(y_true, y_proba)
-    # thresholds has one fewer element than precision/recall
     f2_scores = []
     for p, r in zip(precision[:-1], recall[:-1]):
         if p + r == 0:
             f2_scores.append(0)
         else:
-            f2 = (5 * p * r) / (4 * p + r)  # F-beta with beta=2
+            f2 = (5 * p * r) / (4 * p + r)
             f2_scores.append(f2)
     best_idx = np.argmax(f2_scores)
     return thresholds[best_idx], f2_scores[best_idx]
@@ -63,20 +62,17 @@ def optimize_thresholds():
     xgb_model = joblib.load(MODELS_DIR / 'xgb_tuned.pkl')
 
     results = {}
+    roc_aucs = {}
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
     for name, model in [('Random Forest', rf_model), ('XGBoost', xgb_model)]:
         y_proba = model.predict_proba(X_test)[:, 1]
+        roc_aucs[name] = roc_auc_score(y_test, y_proba)
 
-        # Baseline: default 0.5 threshold
         default_result = evaluate_at_threshold(y_test, y_proba, 0.5, f"{name} — Default")
-
-        # Youden's J
         youden_thresh, j_score = find_youden_threshold(y_test, y_proba)
         youden_result = evaluate_at_threshold(y_test, y_proba, youden_thresh, f"{name} — Youden's J")
-
-        # F2-optimal (Recall-weighted)
         f2_thresh, f2_score = find_f2_threshold(y_test, y_proba)
         f2_result = evaluate_at_threshold(y_test, y_proba, f2_thresh, f"{name} — F2-optimal")
 
@@ -86,7 +82,6 @@ def optimize_thresholds():
             'f2_optimal': f2_result
         }
 
-        # Precision-Recall curve visualization
         precision, recall, thresholds = precision_recall_curve(y_test, y_proba)
         plt.figure(figsize=(7, 5))
         plt.plot(thresholds, precision[:-1], label='Precision')
@@ -102,19 +97,28 @@ def optimize_thresholds():
         plt.savefig(RESULTS_DIR / f'{name.lower().replace(" ", "_")}_threshold_curve.png')
         plt.show()
 
-    # Save chosen thresholds for use in app.py / predict.py later
-    # Final decision: XGBoost is the production model, using Youden's J threshold
+    # Build rationale dynamically from actual computed values — never hardcode these numbers
+    xgb_default = results['XGBoost']['default']
+    xgb_youden = results['XGBoost']['youden']
+
+    rationale = (
+        f"XGBoost selected over Random Forest for higher test ROC-AUC "
+        f"({roc_aucs['XGBoost']:.3f} vs {roc_aucs['Random Forest']:.3f}) "
+        f"and better precision-recall tradeoff at comparable operating points. "
+        f"Youden's J threshold chosen over F2-optimal: improves recall over default "
+        f"({xgb_default['recall']:.3f}->{xgb_youden['recall']:.3f}) at "
+        f"{'near-zero' if abs(xgb_default['precision'] - xgb_youden['precision']) < 0.02 else 'modest'} "
+        f"precision cost ({xgb_default['precision']:.3f}->{xgb_youden['precision']:.3f}), "
+        f"unlike F2-optimal's steeper precision drop."
+    )
+
     final_config = {
         'model': 'xgboost',
         'model_path': str(MODELS_DIR / 'xgb_tuned.pkl'),
         'threshold': results['XGBoost']['youden']['threshold'],
         'threshold_method': "youden's_j",
-        'rationale': (
-            "XGBoost selected over Random Forest for higher test ROC-AUC (0.938 vs 0.932) "
-            "and better precision-recall tradeoff at comparable operating points. "
-            "Youden's J threshold chosen over F2-optimal: improves recall over default "
-            "(0.817->0.831) at near-zero precision cost, unlike F2-optimal's steep precision drop."
-        )
+        'test_roc_auc': {name: roc_aucs[name] for name in roc_aucs},
+        'rationale': rationale
     }
     with open(MODELS_DIR / 'decision_config.json', 'w') as f:
         json.dump(final_config, f, indent=2)

@@ -3,5 +3,9 @@
   "model_path": "C:\\Users\\RRH\\Desktop\\VSD\\Student-AI-Dropout-Risk-System\\models\\xgb_tuned.pkl",
   "threshold": 0.4459611773490906,
   "threshold_method": "youden's_j",
-  "rationale": "XGBoost selected over Random Forest for higher test ROC-AUC (0.938 vs 0.932) and better precision-recall tradeoff at comparable operating points. Youden's J threshold chosen over F2-optimal: improves recall over default (0.817->0.831) at near-zero precision cost, unlike F2-optimal's steep precision drop."
+  "test_roc_auc": {
+    "Random Forest": 0.9317569309367018,
+    "XGBoost": 0.9354303859764243
+  },
+  "rationale": "XGBoost selected over Random Forest for higher test ROC-AUC (0.935 vs 0.932) and better precision-recall tradeoff at comparable operating points. Youden's J threshold chosen over F2-optimal: improves recall over default (0.835->0.863) at near-zero precision cost (0.795->0.780), unlike F2-optimal's steeper precision drop."
 }
